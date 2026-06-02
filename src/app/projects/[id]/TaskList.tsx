@@ -22,6 +22,8 @@ export default function TaskList({
   const supabase = createClient()
 
   // Local State for Tasks and Error Handling
+  const [overdueTasks, setOverdueTasks] = useState<(Task & { assignee_name: string })[] | null>(null)
+  const [isCheckingOverdue, setIsCheckingOverdue] = useState(false)
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   
@@ -128,6 +130,24 @@ export default function TaskList({
     }
     
     setEditingTaskId(null)
+  }
+
+  // Call Edge Function to get overdue tasks (Requirement R8)
+  const checkOverdueTasks = async () => {
+    setIsCheckingOverdue(true)
+    setErrorMsg(null)
+    try {
+      const { data, error } = await supabase.functions.invoke('overdue-tasks', {
+        body: { project_id: projectId }
+      })
+      
+      if (error) throw error
+      setOverdueTasks(data)
+    } catch (err) {
+  setErrorMsg(`Edge Function Error: ${err instanceof Error ? err.message : 'Unknown error'}`)
+} finally {
+      setIsCheckingOverdue(false)
+    }
   }
 
   return (

@@ -4,7 +4,7 @@ import TaskList from './TaskList'
 import Link from 'next/link'
 
 export default async function ProjectPage({ params }: { params: { id: string } }) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { id } = params
 
   // Fetch project details. RLS ensures users only see their workspace's projects.
