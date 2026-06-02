@@ -1,13 +1,9 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
-import Header from '../components/Header'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Task Manager Workspace',
-  description: 'Manage your projects and tasks effectively.',
+  title: 'Aspio Task Manager',
+  description: 'Task management workspace for Aspio Evaluation',
 }
 
 export default function RootLayout({
@@ -17,10 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-gray-50 min-h-screen`}>
-        <Header />
-        {children}
-      </body>
+      <body className="bg-gray-50">{children}</body>
     </html>
   )
 }

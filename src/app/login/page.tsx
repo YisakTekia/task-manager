@@ -23,7 +23,7 @@ export default function LoginPage() {
       if (response?.error) {
         setErrorMsg(response.error)
       }
-    } catch (err) {
+    } catch {
       setErrorMsg('An unexpected error occurred. Please try again.')
     } finally {
       setIsLoading(false)
