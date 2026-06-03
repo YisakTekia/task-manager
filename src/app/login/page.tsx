@@ -8,24 +8,21 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isLoginView, setIsLoginView] = useState<boolean>(true)
 
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  // Modern Next.js Server Action handler for the form
+  async function handleAuth(formData: FormData) {
     setIsLoading(true)
     setErrorMsg(null)
-
-    const formData = new FormData(event.currentTarget)
     
-    try {
-      const response = isLoginView 
-        ? await login(formData) 
-        : await signup(formData)
+    // Determine which server action to call based on the current UI state
+    const actionToRun = isLoginView ? login : signup
+    
+    // Call the server action directly. 
+    // Note: No try...catch block is used here so Next.js can handle redirects normally.
+    const response = await actionToRun(formData)
         
-      if (response?.error) {
-        setErrorMsg(response.error)
-      }
-    } catch {
-      setErrorMsg('An unexpected error occurred. Please try again.')
-    } finally {
+    // Only display an error if the Supabase action explicitly returns one
+    if (response?.error) {
+      setErrorMsg(response.error)
       setIsLoading(false)
     }
   }
@@ -42,7 +39,8 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <form onSubmit={onSubmit} className="mt-8 space-y-6">
+        {/* Key fix: Replaced 'onSubmit' with 'action' for native Next.js handling */}
+        <form action={handleAuth} className="mt-8 space-y-6">
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
