@@ -79,11 +79,27 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-6xl p-6">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Workspaces Dashboard</h1>
-        <button className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors">
-          + New Workspace
-        </button>
+        
+        <form 
+          action={async (formData) => {
+            'use server'
+            await createWorkspace(formData)
+          }} 
+          className="flex items-center gap-2"
+        >
+          <input 
+            type="text" 
+            name="name" 
+            required 
+            placeholder="New workspace name..." 
+            className="w-full sm:w-auto rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <button type="submit" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors whitespace-nowrap">
+            + Create Workspace
+          </button>
+        </form>
       </div>
 
       <div className="space-y-8">

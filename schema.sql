@@ -90,7 +90,7 @@ CREATE POLICY "Users can delete tasks" ON public.tasks FOR DELETE TO authenticat
 
 -- 1. Insert Workspaces
 INSERT INTO public.workspaces (id, name) VALUES 
-('a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d', 'Aspio Evaluation Workspace'),
+('a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d', ' Evaluation Workspace'),
 ('f6e5d4c3-b2a1-4f5e-8d7c-6b5a4f3e2d1c', 'Personal Projects Workspace')
 ON CONFLICT DO NOTHING;
 

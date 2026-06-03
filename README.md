@@ -1,4 +1,4 @@
-# Aspio Fullstack Task Manager
+#  Fullstack Task Manager
 
 ## ⏱️ Time Log
 - **Exact Start Time:**  Monday, June 2, 2026, 02:40 PM (GMT+3)

@@ -24,6 +24,10 @@ export default function TaskList({
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   
+  // States for Adding and Editing Tasks
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [isAddingTask, setIsAddingTask] = useState(false)
+  
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<{
     title: string;
@@ -34,10 +38,11 @@ export default function TaskList({
 
   const [workspaceMembers, setWorkspaceMembers] = useState<User[]>([])
 
-  // State for Edge Function (Overdue Tasks)
+  // States for the Edge Function (Overdue Tasks)
   const [overdueTasks, setOverdueTasks] = useState<Task[] | null>(null)
   const [isCheckingOverdue, setIsCheckingOverdue] = useState(false)
 
+  // URL-based Filtering Logic
   const statusFilter = searchParams.get('status')
   const assigneeFilter = searchParams.get('assignee')
 
@@ -57,6 +62,7 @@ export default function TaskList({
     router.push(`${pathname}${search ? `?${search}` : ''}`, { scroll: false })
   }
 
+  // Fetch workspace members for the assignee dropdown
   useEffect(() => {
     const fetchMembers = async () => {
       const { data: project } = await supabase.from('projects').select('workspace_id').eq('id', projectId).single()
@@ -68,54 +74,113 @@ export default function TaskList({
         .eq('workspace_id', project.workspace_id)
         
       if (members) {
+        // Create mock emails based on User IDs for display purposes
         setWorkspaceMembers(members.map(m => ({ id: m.user_id, email: `User-${m.user_id.substring(0,4)}` })))
       }
     }
     fetchMembers()
   }, [projectId, supabase])
 
+  // Realtime Subscriptions via Supabase Channels
   useEffect(() => {
     const channel = supabase
       .channel(`realtime:project:${projectId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `project_id=eq.${projectId}` },
         (payload) => {
-          if (payload.eventType === 'INSERT') setTasks((prev) => [payload.new as Task, ...prev])
-          else if (payload.eventType === 'UPDATE') setTasks((prev) => prev.map(t => t.id === payload.new.id ? payload.new as Task : t))
-          else if (payload.eventType === 'DELETE') setTasks((prev) => prev.filter(t => t.id !== payload.old.id))
+          if (payload.eventType === 'INSERT') {
+            // Prevent duplicate insertions during Optimistic UI updates
+            setTasks((prev) => {
+              const exists = prev.find(t => t.id === payload.new.id)
+              return exists ? prev : [payload.new as Task, ...prev]
+            })
+          }
+          else if (payload.eventType === 'UPDATE') {
+            setTasks((prev) => prev.map(t => t.id === payload.new.id ? payload.new as Task : t))
+          }
+          else if (payload.eventType === 'DELETE') {
+            setTasks((prev) => prev.filter(t => t.id !== payload.old.id))
+          }
         }
       ).subscribe()
 
+    // Cleanup subscription on unmount
     return () => { supabase.removeChannel(channel) }
   }, [projectId, supabase])
 
+  // Add Task with Optimistic UI (No page reload)
+  const handleAddTask = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newTaskTitle.trim()) return
+    setIsAddingTask(true)
+    setErrorMsg(null)
+
+    const newTask = {
+      title: newTaskTitle,
+      project_id: projectId,
+      status: 'todo' as TaskStatus,
+    }
+
+    // 1. Optimistic UI: Render the task on the screen instantly
+    const tempId = `temp-${Date.now()}`
+    const optimisticTask: Task = {
+      ...newTask,
+      id: tempId,
+      description: null,
+      due_date: null,
+      assignee_id: null,
+      created_at: new Date().toISOString()
+    }
+    
+    setTasks(prev => [optimisticTask, ...prev])
+    setNewTaskTitle('')
+    setIsAddingTask(false)
+
+    // 2. Send data to the database
+    const { data, error } = await supabase.from('tasks').insert(newTask).select().single()
+
+    if (error) {
+      setErrorMsg(`Failed to add task: ${error.message}`)
+      setTasks(prev => prev.filter(t => t.id !== tempId)) // Rollback UI if API fails
+    } else if (data) {
+      setTasks(prev => prev.map(t => t.id === tempId ? data : t)) // Update temporary ID with real Database ID
+    }
+  }
+
+  // Update Status with Optimistic UI
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
     setErrorMsg(null)
     const previousTasks = [...tasks]
     
+    // Instantly update local state
     setTasks((prev) => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
+    
     const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', taskId)
 
     if (error) {
-      setTasks(previousTasks)
+      setTasks(previousTasks) // Rollback on error
       setErrorMsg(`Failed to update status: ${error.message}`)
     }
   }
 
+  // Delete Task with Optimistic UI
   const handleDeleteTask = async (taskId: string) => {
     if (!window.confirm('Are you sure you want to delete this task?')) return
 
     setErrorMsg(null)
     const previousTasks = [...tasks]
     
+    // Instantly remove from local state
     setTasks((prev) => prev.filter(t => t.id !== taskId))
+    
     const { error } = await supabase.from('tasks').delete().eq('id', taskId)
 
     if (error) {
-      setTasks(previousTasks)
+      setTasks(previousTasks) // Rollback on error
       setErrorMsg(`Failed to delete task: ${error.message}`)
     }
   }
 
+  // Save Inline Edits
   const handleSaveEdits = async (taskId: string) => {
     if (!editValues.title.trim()) {
       setEditingTaskId(null)
@@ -133,6 +198,7 @@ export default function TaskList({
       .eq('id', taskId)
 
     if (error) setErrorMsg(`Failed to save edits: ${error.message}`)
+    
     setEditingTaskId(null)
     router.refresh()
   }
@@ -147,8 +213,8 @@ export default function TaskList({
     })
   }
 
-  // --- NEW: Trigger Edge Function ---
- const handleCheckOverdue = async () => {
+  // Trigger Supabase Edge Function to fetch overdue tasks
+  const handleCheckOverdue = async () => {
     setIsCheckingOverdue(true)
     setErrorMsg(null)
     try {
@@ -157,7 +223,8 @@ export default function TaskList({
       })
       if (error) throw error
       setOverdueTasks(data || [])
-    } catch (err) { 
+    } catch (err) {
+      // Strict TypeScript error handling instead of using 'any'
       if (err instanceof Error) {
         setErrorMsg(`Edge Function Error: ${err.message}`)
       } else {
@@ -170,7 +237,27 @@ export default function TaskList({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Filters & Action Bar */}
+      
+      {/* Quick Add Task Form */}
+      <form onSubmit={handleAddTask} className="flex flex-col sm:flex-row gap-3 p-3 sm:p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <input 
+          type="text" 
+          value={newTaskTitle}
+          onChange={(e) => setNewTaskTitle(e.target.value)}
+          placeholder="What needs to be done?" 
+          className="flex-1 rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          disabled={isAddingTask}
+        />
+        <button 
+          type="submit" 
+          disabled={!newTaskTitle.trim() || isAddingTask}
+          className="w-full sm:w-auto rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+        >
+          {isAddingTask ? 'Adding...' : '+ Add Task'}
+        </button>
+      </form>
+
+      {/* Filters and Edge Function Action Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-3 sm:p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
           <div className="flex flex-col w-full sm:w-auto">
@@ -202,7 +289,7 @@ export default function TaskList({
           </div>
         </div>
 
-        {/* NEW: Edge Function Button */}
+        {/* Edge Function Trigger Button */}
         <button 
           onClick={handleCheckOverdue}
           disabled={isCheckingOverdue}
@@ -221,7 +308,7 @@ export default function TaskList({
         <div className="p-3 sm:p-4 text-sm text-red-700 bg-red-50 rounded-lg border border-red-200">{errorMsg}</div>
       )}
 
-      {/* NEW: Overdue Tasks Display Panel */}
+      {/* Overdue Tasks Display Panel */}
       {overdueTasks !== null && (
         <div className="p-4 bg-red-50/50 border border-red-200 rounded-lg shadow-sm">
           <div className="flex justify-between items-center mb-3 border-b border-red-100 pb-2">
@@ -261,7 +348,7 @@ export default function TaskList({
             <div key={task.id} className="p-3 sm:p-4 bg-white rounded-lg border border-gray-200 shadow-sm transition-all hover:border-gray-300">
               
               {editingTaskId === task.id ? (
-                // --- FULL INLINE EDITING PANEL (Responsive) ---
+                // --- FULL INLINE EDITING PANEL ---
                 <div className="space-y-3 sm:space-y-4">
                   <input 
                     type="text" 
@@ -305,7 +392,7 @@ export default function TaskList({
                   </div>
                 </div>
               ) : (
-                // --- VIEW MODE (Responsive Layout) ---
+                // --- VIEW MODE ---
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div className="flex items-start gap-2 pr-2">

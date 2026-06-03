@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Aspio Task Manager',
-  description: 'Task management workspace for Aspio Evaluation',
+  title: ' Task Manager',
+  description: 'Task management workspace for  Evaluation',
 }
 
 export default function RootLayout({
