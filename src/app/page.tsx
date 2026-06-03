@@ -1,8 +1,15 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
+
+  // 0. Verify if the user is authenticated, otherwise redirect to login
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    redirect('/login')
+  }
 
   // 1. Fetch Workspaces (RLS ensures users only see their own)
   const { data: workspaces, error: wsError } = await supabase

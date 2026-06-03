@@ -63,3 +63,31 @@ export async function signup(formData: FormData) {
   // Redirect the user to the main dashboard upon successful signup
   redirect('/')
 }
+
+export async function createTask(formData: FormData) {
+  // Initialize the Supabase client
+  const supabase = await createClient()
+  
+  // Extract task title from the submitted form data
+  const title = formData.get('title') as string
+  
+  // Get the currently authenticated user
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    return { error: 'You must be logged in to create a task' }
+  }
+
+  // Insert the new task into the database, linked to the user's ID
+  const { error } = await supabase.from('tasks').insert({
+    title,
+    user_id: user.id,
+  })
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  // Revalidate the home page cache to immediately display the new task
+  revalidatePath('/')
+}
