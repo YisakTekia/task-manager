@@ -22,7 +22,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   if (projectError || !project) {
     return (
       <div className="mx-auto max-w-2xl p-10 mt-20 bg-red-50 border border-red-200 rounded-xl shadow-sm">
-        <h1 className="text-2xl font-bold text-red-800 mb-4">Oops! Couldn't load this project.</h1>
+        <h1 className="text-2xl font-bold text-red-800 mb-4">Oops! Couldnot&apos;t load this project.</h1>
         <div className="space-y-2 text-sm text-red-700 bg-white p-4 rounded border border-red-100">
           <p><strong>Searched ID:</strong> {id}</p>
           <p><strong>Database Error:</strong> {projectError?.message || 'No project found with this ID. It might be deleted or blocked by RLS policies.'}</p>
