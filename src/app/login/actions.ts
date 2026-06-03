@@ -1,93 +1,129 @@
 'use server'
 
-// Import Next.js server actions utilities for caching and routing
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-
-// Import the Supabase server client instance
 import { createClient } from '@/utils/supabase/server'
 
 export async function login(formData: FormData) {
-  // Initialize the Supabase client
   const supabase = await createClient()
-  
-  // Extract email and password from the submitted form data
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
-  // Attempt to sign in the user with Supabase Auth
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  })
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
 
-  // If there is an authentication error, return the error message to the client
-  if (error) {
-    return { error: error.message }
-  }
+  if (error) return { error: error.message }
 
-  // Revalidate the layout cache to update UI state (e.g., navbar session state)
   revalidatePath('/', 'layout')
-  
-  // Redirect the user to the main dashboard upon successful login
   redirect('/')
 }
 
 export async function signup(formData: FormData) {
-  // Initialize the Supabase client
   const supabase = await createClient()
-  
-  // Extract email and password from the submitted form data
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
-  // Attempt to register the new user
   const { error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      // Explicitly define the redirect URL for email verification
-      // This strictly resolves the "Invalid path specified in request URL" error in production
       emailRedirectTo: 'https://task-manager-chi-pink-75.vercel.app',
     }
   })
 
-  // If there is a registration error, return the error message to the client
-  if (error) {
-    return { error: error.message }
-  }
+  if (error) return { error: error.message }
 
-  // Revalidate the layout cache to reflect the new session
   revalidatePath('/', 'layout')
-  
-  // Redirect the user to the main dashboard upon successful signup
   redirect('/')
 }
 
-export async function createTask(formData: FormData) {
-  // Initialize the Supabase client
+export async function createWorkspace(formData: FormData) {
+  // Initialize the Supabase server client securely
   const supabase = await createClient()
   
-  // Extract task title from the submitted form data
-  const title = formData.get('title') as string
-  
-  // Get the currently authenticated user
+  // Extract and strictly type the workspace name
+  const name = formData.get('name') as string
+
+  // Fetch the currently authenticated user
   const { data: { user } } = await supabase.auth.getUser()
-  
+
   if (!user) {
-    return { error: 'You must be logged in to create a task' }
+    return { error: 'Authentication required to create a workspace' }
   }
 
-  // Insert the new task into the database, linked to the user's ID
-  const { error } = await supabase.from('tasks').insert({
-    title,
-    user_id: user.id,
+  // 1. Generate a new UUID for the workspace to use across tables
+  const newWorkspaceId = crypto.randomUUID()
+
+  // 2. Insert the core workspace record
+  const { error: workspaceError } = await supabase.from('workspaces').insert({
+    id: newWorkspaceId,
+    name: name
+  })
+
+  if (workspaceError) {
+    return { error: workspaceError.message }
+  }
+
+  // 3. Link the user to the workspace to satisfy RLS viewing policies
+  // Note: If TS highlights 'user_id' or 'workspace_id', press Ctrl+Space to match your exact Supabase column names
+  const { error: memberError } = await supabase.from('workspace_members').insert({
+    workspace_id: newWorkspaceId,
+    user_id: user.id
+  })
+
+  if (memberError) {
+    console.error("Failed to link member to workspace:", memberError)
+    // Optional: You can choose to return an error here, or let the workspace creation succeed
+  }
+
+  // Revalidate the dashboard to immediately display the new workspace
+  revalidatePath('/')
+}
+
+export async function createProject(formData: FormData) {
+  const supabase = await createClient()
+  
+  const name = formData.get('name') as string
+  const workspace_id = formData.get('workspace_id') as string
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Authentication required' }
+
+  // Insert project
+  const { error } = await supabase.from('projects').insert({
+    name: name,
+    workspace_id: workspace_id,
+    // Add any other required fields here if your table needs them
   })
 
   if (error) {
+    console.error("Project error:", error)
     return { error: error.message }
   }
 
-  // Revalidate the home page cache to immediately display the new task
   revalidatePath('/')
+
+}
+//create task server action for the form in TaskList.tsx
+export async function createTask(formData: FormData) {
+  const supabase = await createClient()
+  
+  const title = formData.get('title') as string
+  const project_id = formData.get('project_id') as string
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Authentication required' }
+
+  const { error } = await supabase.from('tasks').insert({
+    id: crypto.randomUUID(), 
+    title: title,
+    project_id: project_id,
+    status: 'todo',
+    assignee_id: user.id
+  })
+
+  if (error) {
+    console.error("Task creation error:", error)
+  }
+
+  revalidatePath(`/projects/${project_id}`)
 }

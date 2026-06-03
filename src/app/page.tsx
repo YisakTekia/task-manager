@@ -1,33 +1,30 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+// Imported both server actions here
+import { createWorkspace, createProject } from './login/actions'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
 
-  // 0. Verify if the user is authenticated, otherwise redirect to login
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     redirect('/login')
   }
 
-  // 1. Fetch Workspaces (RLS ensures users only see their own)
   const { data: workspaces, error: wsError } = await supabase
     .from('workspaces')
     .select('*')
     .order('created_at', { ascending: false })
 
-  // 2. Fetch Projects
   const { data: projects, error: projError } = await supabase
     .from('projects')
     .select('*')
 
-  // 3. Fetch Tasks (to calculate status counts)
   const { data: tasks, error: tasksError } = await supabase
     .from('tasks')
     .select('id, project_id, status')
 
-  // Error State handling (Requirement R6)
   if (wsError || projError || tasksError) {
     return (
       <div className="mx-auto max-w-6xl p-6">
@@ -41,8 +38,13 @@ export default async function DashboardPage() {
     )
   }
 
-  // Empty State handling (Requirement R6)
-  if (!workspaces || workspaces.length === 0) {
+  // 1. DEDUPLICATION LOGIC: Ensure workspaces are unique by ID
+  const uniqueWorkspaces = workspaces 
+    ? Array.from(new Map(workspaces.map(item => [item.id, item])).values())
+    : []
+
+  // Use uniqueWorkspaces instead of raw workspaces from here down
+  if (uniqueWorkspaces.length === 0) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center space-y-4 px-4 text-center">
         <div className="rounded-full bg-blue-50 p-3">
@@ -52,9 +54,25 @@ export default async function DashboardPage() {
         </div>
         <h2 className="text-xl font-semibold text-gray-900">No Workspaces Found</h2>
         <p className="max-w-sm text-gray-500">You are not a member of any workspaces yet. Create one to start managing your projects.</p>
-        <button className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors">
-          Create Workspace
-        </button>
+        
+        <form 
+          action={async (formData) => {
+            'use server'
+            await createWorkspace(formData)
+          }} 
+          className="mt-6 flex flex-col items-center gap-3 w-full max-w-xs"
+        >
+          <input 
+            type="text" 
+            name="name" 
+            required 
+            placeholder="Enter workspace name..." 
+            className="w-full rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <button type="submit" className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors">
+            Create Workspace
+          </button>
+        </form>
       </div>
     )
   }
@@ -69,7 +87,8 @@ export default async function DashboardPage() {
       </div>
 
       <div className="space-y-8">
-        {workspaces.map((workspace) => {
+        {/* Mapping through unique workspaces to prevent duplicates */}
+        {uniqueWorkspaces.map((workspace) => {
           const workspaceProjects = projects?.filter(p => p.workspace_id === workspace.id) || []
 
           return (
@@ -79,10 +98,10 @@ export default async function DashboardPage() {
                 <span className="text-sm text-gray-500">{workspaceProjects.length} Projects</span>
               </div>
               
+              {/* Projects Grid */}
               {workspaceProjects.length > 0 ? (
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-6">
                   {workspaceProjects.map((project) => {
-                    // Calculate task counts per status
                     const projectTasks = tasks?.filter(t => t.project_id === project.id) || []
                     const todoCount = projectTasks.filter(t => t.status === 'todo').length
                     const inProgressCount = projectTasks.filter(t => t.status === 'in_progress').length
@@ -115,13 +134,36 @@ export default async function DashboardPage() {
                   })}
                 </div>
               ) : (
-                <div className="rounded-md bg-gray-50 py-8 text-center border border-dashed border-gray-200">
-                  <p className="text-sm text-gray-500 mb-3">No projects in this workspace yet.</p>
-                  <button className="text-sm font-medium text-blue-600 hover:text-blue-800">
-                    Create your first project &rarr;
-                  </button>
+                <div className="rounded-md bg-gray-50 py-8 text-center border border-dashed border-gray-200 mb-6">
+                  <p className="text-sm text-gray-500">No projects in this workspace yet.</p>
                 </div>
               )}
+
+              {/* 2. CREATE PROJECT FORM: Added with use server wrapper */}
+              <div className="border-t border-gray-100 pt-4">
+                <form 
+                  action={async (formData) => {
+                    'use server'
+                    await createProject(formData)
+                  }} 
+                  className="flex items-center gap-3 max-w-md"
+                >
+                  {/* Hidden input to securely link project to workspace */}
+                  <input type="hidden" name="workspace_id" value={workspace.id} />
+                  
+                  <input 
+                    type="text" 
+                    name="name" 
+                    required 
+                    placeholder="New project name..." 
+                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <button type="submit" className="rounded-md bg-blue-50 px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-100 transition-colors whitespace-nowrap">
+                    Add Project
+                  </button>
+                </form>
+              </div>
+
             </div>
           )
         })}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { login, signup } from './actions'
+import { login, signup } from './actions' 
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState<boolean>(false)
@@ -39,7 +39,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Key fix: Replaced 'onSubmit' with 'action' for native Next.js handling */}
+        {/* Form handling using Next.js Server Actions */}
         <form action={handleAuth} className="mt-8 space-y-6">
           <div className="space-y-4">
             <div>
@@ -71,6 +71,7 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Error Message Display */}
           {errorMsg && (
             <div className="rounded-md bg-red-50 p-4">
               <div className="text-sm text-red-700">{errorMsg}</div>
@@ -86,6 +87,7 @@ export default function LoginPage() {
           </button>
         </form>
 
+        {/* Toggle between Login and Signup modes */}
         <div className="text-center">
           <button
             type="button"

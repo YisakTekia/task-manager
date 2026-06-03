@@ -1,26 +1,41 @@
 import { createClient } from '@/utils/supabase/server'
-import { notFound } from 'next/navigation'
 import TaskList from './TaskList'
 import Link from 'next/link'
+import { createTask } from '@/app/login/actions'
 
-export default async function ProjectPage({ params }: { params: { id: string } }) {
+// Next.js 15 requires params to be awaited
+export default async function ProjectPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const supabase = await createClient()
-  const { id } = params
+  
+  // 1. Await params to safely get the project ID
+  const resolvedParams = await params
+  const id = resolvedParams.id
 
-  // Fetch project details. RLS ensures users only see their workspace's projects.
+  // 2. Fetch project details
   const { data: project, error: projectError } = await supabase
     .from('projects')
     .select('*')
     .eq('id', id)
     .single()
 
-  // Return 404 if the project doesn't exist or access is denied
+  // 3. DEBUG UI: Instead of a blank 404 page, show exactly what failed
   if (projectError || !project) {
-    notFound() 
+    return (
+      <div className="mx-auto max-w-2xl p-10 mt-20 bg-red-50 border border-red-200 rounded-xl shadow-sm">
+        <h1 className="text-2xl font-bold text-red-800 mb-4">Oops! Couldn't load this project.</h1>
+        <div className="space-y-2 text-sm text-red-700 bg-white p-4 rounded border border-red-100">
+          <p><strong>Searched ID:</strong> {id}</p>
+          <p><strong>Database Error:</strong> {projectError?.message || 'No project found with this ID. It might be deleted or blocked by RLS policies.'}</p>
+        </div>
+        <Link href="/" className="mt-6 inline-block font-medium text-blue-600 hover:text-blue-800 transition-colors">
+          &larr; Back to Dashboard
+        </Link>
+      </div>
+    )
   }
 
-  // Fetch initial tasks for this project (No useEffect for initial data fetching - R38)
-  const { data: initialTasks, error: tasksError } = await supabase
+  // 4. Fetch initial tasks for this project
+  const { data: initialTasks } = await supabase
     .from('tasks')
     .select('*')
     .eq('project_id', project.id)
@@ -41,7 +56,32 @@ export default async function ProjectPage({ params }: { params: { id: string } }
         </div>
       </div>
 
-      {/* Injecting the Client Component that handles Realtime and Optimistic UI */}
+      <div className="mb-8 bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <form 
+          action={async (formData) => {
+            'use server'
+            await createTask(formData)
+          }} 
+          className="flex items-center gap-3"
+        >
+          <input type="hidden" name="project_id" value={project.id} />
+          
+          <input 
+            type="text" 
+            name="title" 
+            required 
+            placeholder="What needs to be done?" 
+            className="flex-1 rounded-md border border-gray-300 px-4 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
+          />
+          <button 
+            type="submit" 
+            className="rounded-md bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors whitespace-nowrap"
+          >
+            + Add Task
+          </button>
+        </form>
+      </div>
+
       <TaskList 
         projectId={project.id} 
         initialTasks={initialTasks || []} 
