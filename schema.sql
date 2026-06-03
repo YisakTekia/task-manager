@@ -107,3 +107,22 @@ INSERT INTO public.projects (id, workspace_id, name) VALUES
 ('33333333-3333-3333-3333-333333333333', 'a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d', 'UI/UX Design'),
 ('44444444-4444-4444-4444-444444444444', 'f6e5d4c3-b2a1-4f5e-8d7c-6b5a4f3e2d1c', 'House Renovation')
 ON CONFLICT DO NOTHING;
+
+-- 4. Insert 15 Tasks (Mixed statuses, assignees, and dates)
+INSERT INTO public.tasks (project_id, title, description, status, assignee_id, due_date) VALUES 
+('11111111-1111-1111-1111-111111111111', 'Setup Next.js App Router', 'Initialize Next.js with Tailwind and TypeScript', 'done', '05d2db45-7d72-42df-807f-4c7b0563a997', '2026-06-01'),
+('11111111-1111-1111-1111-111111111111', 'Implement Task List UI', 'Create responsive grid for tasks', 'in_progress', '05d2db45-7d72-42df-807f-4c7b0563a997', '2026-06-10'),
+('11111111-1111-1111-1111-111111111111', 'Add Optimistic UI', 'Update state before server response', 'todo', NULL, '2026-06-15'),
+('11111111-1111-1111-1111-111111111111', 'Fix mobile layout', 'Adjust padding on small screens', 'todo', '05d2db45-7d72-42df-807f-4c7b0563a997', '2026-05-20'), -- Overdue
+('22222222-2222-2222-2222-222222222222', 'Design Database Schema', 'Define tables and RLS', 'done', '05d2db45-7d72-42df-807f-4c7b0563a997', '2026-06-02'),
+('22222222-2222-2222-2222-222222222222', 'Write RLS Policies', 'Secure all 4 operations', 'done', NULL, '2026-06-03'),
+('22222222-2222-2222-2222-222222222222', 'Create Edge Function', 'Fetch overdue tasks', 'in_progress', '05d2db45-7d72-42df-807f-4c7b0563a997', '2026-06-05'),
+('22222222-2222-2222-2222-222222222222', 'Test Realtime Subscriptions', 'Verify channel updates', 'todo', '05d2db45-7d72-42df-807f-4c7b0563a997', '2026-05-15'), -- Overdue
+('33333333-3333-3333-3333-333333333333', 'Wireframe Dashboard', 'Low fidelity mockups', 'done', '05d2db45-7d72-42df-807f-4c7b0563a997', '2026-05-28'),
+('33333333-3333-3333-3333-333333333333', 'Select Color Palette', 'Choose accessible colors', 'done', NULL, '2026-05-29'),
+('33333333-3333-3333-3333-333333333333', 'Design Edit Icon Hover', 'Add micro-interactions', 'in_progress', '05d2db45-7d72-42df-807f-4c7b0563a997', '2026-06-12'),
+('33333333-3333-3333-3333-333333333333', 'Export SVG assets', 'Prepare icons for dev', 'todo', '05d2db45-7d72-42df-807f-4c7b0563a997', '2026-06-20'),
+('44444444-4444-4444-4444-444444444444', 'Call Plumber', 'Fix kitchen sink', 'todo', NULL, '2026-06-10'),
+('44444444-4444-4444-4444-444444444444', 'Buy Paint', 'Get 2 gallons of white paint', 'in_progress', '05d2db45-7d72-42df-807f-4c7b0563a997', '2026-06-08'),
+('44444444-4444-4444-4444-444444444444', 'Measure windows', 'For new blinds', 'todo', '05d2db45-7d72-42df-807f-4c7b0563a997', '2026-05-18') -- Overdue
+ON CONFLICT DO NOTHING;
